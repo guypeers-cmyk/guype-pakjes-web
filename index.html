@@ -103,7 +103,16 @@
 
     function renderHistory(history){
       if (!history.length) return '<div class="history-empty">Nog niet gecontroleerd</div>';
-      return `<div class="history-list">${history.map(entry => `<div class="history-entry"><span class="history-dot"></span><div><strong>${escapeHtml(entry.status || 'Onbekend')}</strong><time>${escapeHtml(entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'Onbekend tijdstip')}</time></div></div>`).join('')}</div>`;
+      const condensedHistory = history.reduce((entries, entry) => {
+        const previous = entries[entries.length - 1];
+        if (previous && previous.status === entry.status) {
+          entries[entries.length - 1] = entry;
+        } else {
+          entries.push(entry);
+        }
+        return entries;
+      }, []);
+      return `<div class="history-list">${condensedHistory.map(entry => `<div class="history-entry"><span class="history-dot"></span><div><strong>${escapeHtml(entry.status || 'Onbekend')}</strong><time>${escapeHtml(entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'Onbekend tijdstip')}</time></div></div>`).join('')}</div>`;
     }
 
     // Improved carrier detection: remove non-alphanumeric, uppercase
