@@ -358,11 +358,6 @@
           render();
         };
 
-        const btnEdit = document.createElement('button');
-        btnEdit.className = 'small';
-        btnEdit.textContent = 'Bewerken';
-        btnEdit.onclick = () => editPackage(p.id);
-
         const btnDelete = document.createElement('button');
         btnDelete.className = 'small ghost';
         btnDelete.textContent = 'Verwijderen';
@@ -370,7 +365,6 @@
 
         controls.appendChild(btnDetails);
         controls.appendChild(btnRefresh);
-        controls.appendChild(btnEdit);
         controls.appendChild(btnDelete);
 
         item.appendChild(meta);
@@ -408,18 +402,6 @@
         const sel = document.getElementById(`status-select-${p.id}`);
         updatePackage({ ...p, status: sel.value });
       };
-    }
-
-    function editPackage(id){
-      const p = packages.find(x => x.id === id);
-      if (!p) return;
-      const code = prompt('Trackingnummer', p.code);
-      if (code === null) return; // cancel
-      const note = prompt('Omschrijving', p.note || '');
-      if (note === null) return;
-      // detect carrier again
-      const carrier = detectCarrier(code);
-      updatePackage({ ...p, code: code.trim(), note: note.trim(), carrier });
     }
 
     function deletePackage(id){
