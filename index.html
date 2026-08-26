@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Pakjes — Volg al je zendingen</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e90ff">
+  <style>
+    :root{--primary:#1e90ff;--muted:#666;--bg:#f7f9fc}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;color:#111;background:var(--bg)}
+    .app{max-width:900px;margin:24px auto;background:#fff;border-radius:10px;box-shadow:0 6px 18px rgba(10,20,40,.08);overflow:hidden}
+    header{background:var(--primary);color:#fff;padding:18px 20px}
+    header h1{margin:0;font-size:20px}
+    .content{padding:18px}
+    form.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+    input[type=text],select,textarea{padding:10px;border:1px solid #e0e6ef;border-radius:8px;flex:1;min-width:200px}
+    button{background:var(--primary);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer}
+    button.ghost{background:#f3f6fb;color:var(--primary);border:1px solid #d7e7ff}
+    .list{margin-top:12px}
+    .item{display:flex;gap:12px;align-items:flex-start;padding:12px;border-bottom:1px solid #f0f3f8}
+    .item .meta{flex:1}
+    .code{font-weight:600}
+    .note{color:var(--muted);margin-top:6px}
+    .status{margin-top:8px;color:#333}
+    .controls{display:flex;flex-direction:column;gap:8px}
+    .small{font-size:13px;padding:6px 8px;border-radius:6px}
+    .tag{display:inline-block;background:#f1f7ff;color:var(--primary);padding:4px 8px;border-radius:999px;font-size:12px;margin-left:8px}
+    .empty{padding:24px;color:var(--muted)}
+    .details{margin-top:8px;background:#fbfdff;border:1px solid #eef6ff;padding:10px;border-radius:8px}
+    footer{padding:12px 18px;background:#fafbff;color:var(--muted);font-size:13px}
+    .actions{display:flex;gap:8px}
+    @media (max-width:640px){.controls{flex-direction:row}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Pakjes — Volg al je zendingen</h1>
+    </header>
+    <div class="content">
+      <form id="addForm" class="row" onsubmit="return false;">
+        <input id="codeInput" type="text" placeholder="Trackingnummer (bv. 3S1234567890)" required />
+        <input id="noteInput" type="text" placeholder="Omschrijving (optioneel)" />
+        <select id="statusSelect" style="width:160px">
+          <option value="Nieuw">Nieuw</option>
+          <option value="In transit">In transit</option>
+          <option value="Bezorgd">Bezorgd</option>
+          <option value="Geannuleerd">Geannuleerd</option>
+        </select>
+        <div class="actions">
+          <button id="addBtn">Toevoegen</button>
+          <button id="importBtn" class="ghost" type="button">Import</button>
+          <button id="exportBtn" class="ghost" type="button">Export</button>
+        </div>
+      </form>
+
+      <form id="filterRow" class="row" style="margin-top:8px;align-items:center;">
+        <input id="searchInput" type="text" placeholder="Zoek op trackingnummer of omschrijving" style="flex:1" />
+        <select id="carrierFilter" style="width:200px">
+          <option value="">Alle carriers</option>
+        </select>
+        <select id="statusFilter" style="width:160px">
+          <option value="">Alle statussen</option>
+          <option value="Nieuw">Nieuw</option>
+          <option value="In transit">In transit</option>
+          <option value="Bezorgd">Bezorgd</option>
+          <option value="Geannuleerd">Geannuleerd</option>
+        </select>
+        <button id="clearFilter" class="ghost" type="button">Wissen</button>
+      </form>
+
+      <div class="list" id="list"></div>
+
+      <div id="empty" class="empty" style="display:none">Nog geen pakketten toegevoegd.</div>
+
+      <!-- hidden file input for import -->
+      <input type="file" id="fileImport" style="display:none" accept="application/json" />
+    </div>
+    <footer>
+      Opslag: localStorage • Bestand: pakjes_app_packages_v1
+    </footer>
+  </div>
+
+  <script>
+    // Storage key
+    const KEY = 'pakjes_app_packages_v1';
+
+    // Small UUIDv4 implementation
+    function uuidv4(){
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
+          return v.toString(16);
+      });
+    }
+
+    // Improved carrier detection: remove non-alphanumeric, uppercase
+    const patterns = [
+      { name: 'Bpost', regex: /^\d{14}$/ },
+      { name: 'PostNL', regex: /^(3S|99)[0-9A-Z]{11,}$/i },
+      { name: 'DHL', regex: /^(JD|JJD)\d{10,}$/i },
+      { name: 'DPD', regex: /^\d{12,14}$/ },
+      { name: 'UPS', regex: /^[0-9A-Z]{18}$/i },
+      { name: 'FedEx', regex: /^\d{12,15}$/ }
+    ];
+
+    function detectCarrier(code){
+      if (!code) return null;
+      const normalized = String(code).replace(/[^0-9A-Z]/gi, '').toUpperCase();
+      for (const p of patterns){
+        if (p.regex.test(normalized)) return p.name;
+      }
+      return null;
+    }
+
+    // Storage helpers with validation
+    function savePackages(list){
+      try{
+        localStorage.setItem(KEY, JSON.stringify(list));
+      }catch(e){
+        console.error('Storage save error', e);
+        alert('Kon pakketten niet opslaan: ' + (e && e.message));
+      }
+    }
+
+    function getAllPackages(){
+      try{
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+        console.warn('Stored packages had unexpected format, resetting');
+        return [];
+      }catch(e){
+        console.error('Storage read error', e);
+        return [];
+      }
+    }
+
+    // App state
+    let packages = getAllPackages();
+
+    // DOM refs
+    const listEl = document.getElementById('list');
+    const emptyEl = document.getElementById('empty');
+    const codeInput = document.getElementById('codeInput');
+    const noteInput = document.getElementById('noteInput');
+    const statusSelect = document.getElementById('statusSelect');
+    const addBtn = document.getElementById('addBtn');
+    const importBtn = document.getElementById('importBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const fileImport = document.getElementById('fileImport');
+    const searchInput = document.getElementById('searchInput');
+    const carrierFilter = document.getElementById('carrierFilter');
+    const statusFilter = document.getElementById('statusFilter');
+    const clearFilter = document.getElementById('clearFilter');
+
+    // Filtering, search and export helpers
+    function getUniqueCarriers(list){
+      const s = new Set();
+      (list || []).forEach(p => { if (p.carrier) s.add(p.carrier); });
+      return Array.from(s).sort();
+    }
+
+    function populateCarrierFilter(){
+      if (!carrierFilter) return;
+      const carriers = getUniqueCarriers(packages);
+      carrierFilter.innerHTML = '<option value="">Alle carriers</option>';
+      carriers.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        carrierFilter.appendChild(opt);
+      });
+    }
+
+    function getFilteredPackages(){
+      const query = (searchInput && searchInput.value || '').trim().toLowerCase();
+      const carrier = (carrierFilter && carrierFilter.value) || '';
+      const status = (statusFilter && statusFilter.value) || '';
+      return packages.filter(p => {
+        if (carrier && (p.carrier || '') !== carrier) return false;
+        if (status && (p.status || '') !== status) return false;
+        if (!query) return true;
+        return (p.code || '').toLowerCase().includes(query) || (p.note || '').toLowerCase().includes(query);
+      });
+    }
+
+    function attachFilterListeners(){
+      if (searchInput) searchInput.oninput = render;
+      if (carrierFilter) carrierFilter.onchange = render;
+      if (statusFilter) statusFilter.onchange = render;
+      if (clearFilter) clearFilter.onclick = () => { if (searchInput) searchInput.value=''; if (carrierFilter) carrierFilter.value=''; if (statusFilter) statusFilter.value=''; render(); };
+      if (exportBtn) exportBtn.onclick = () => { exportJSON(packages); exportCSV(packages); };
+    }
+
+    function exportJSON(list){
+      const blob = new Blob([JSON.stringify(list, null, 2)], {type:'application/json'});
+      downloadBlob(blob, 'pakjes-export.json');
+    }
+
+    function exportCSV(list){
+      if (!list || !list.length) return;
+      const headers = ['id','code','carrier','note','status','createdAt'];
+      const rows = list.map(p => headers.map(h => '"' + String(p[h]||'').replace(/"/g,'""') + '"').join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], {type:'text/csv'});
+      downloadBlob(blob, 'pakjes-export.csv');
+    }
+
+    function downloadBlob(blob, filename){
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 5000);
+    }
+
+    function render(){
+      listEl.innerHTML = '';
+      if (!packages || packages.length === 0){
+        emptyEl.style.display = 'block';
+        return;
+      }
+      emptyEl.style.display = 'none';
+
+      getFilteredPackages().forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'item';
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+
+        const codeRow = document.createElement('div');
+        codeRow.innerHTML = `<span class="code">${escapeHtml(p.code)}</span>` + (p.carrier ? ` <span class="tag">${escapeHtml(p.carrier)}</span>` : ' <span class="tag">Onbekend</span>');
+
+        const noteRow = document.createElement('div');
+        noteRow.className = 'note';
+        noteRow.textContent = p.note || '';
+
+        const statusRow = document.createElement('div');
+        statusRow.className = 'status';
+        statusRow.textContent = 'Status: ' + (p.status || 'Nieuw');
+
+        const created = document.createElement('div');
+        created.className = 'meta small';
+        created.textContent = 'Aangemaakt: ' + new Date(p.createdAt).toLocaleString();
+
+        meta.appendChild(codeRow);
+        meta.appendChild(noteRow);
+        meta.appendChild(statusRow);
+        meta.appendChild(created);
+
+        const controls = document.createElement('div');
+        controls.className = 'controls';
+
+        const btnDetails = document.createElement('button');
+        btnDetails.className = 'small ghost';
+        btnDetails.textContent = 'Details';
+        btnDetails.onclick = () => toggleDetails(p.id, item);
+
+        const btnEdit = document.createElement('button');
+        btnEdit.className = 'small';
+        btnEdit.textContent = 'Bewerken';
+        btnEdit.onclick = () => editPackage(p.id);
+
+        const btnDelete = document.createElement('button');
+        btnDelete.className = 'small ghost';
+        btnDelete.textContent = 'Verwijderen';
+        btnDelete.onclick = () => { if (confirm('Pakket verwijderen?')) deletePackage(p.id); };
+
+        controls.appendChild(btnDetails);
+        controls.appendChild(btnEdit);
+        controls.appendChild(btnDelete);
+
+        item.appendChild(meta);
+        item.appendChild(controls);
+
+        listEl.appendChild(item);
+      });
+    }
+
+    function toggleDetails(id, itemEl){
+      const existing = itemEl.querySelector('.details');
+      if (existing){ existing.remove(); return; }
+      const p = packages.find(x => x.id === id);
+      if (!p) return;
+      const d = document.createElement('div');
+      d.className = 'details';
+      d.innerHTML = `
+        <div><strong>Tracking:</strong> ${escapeHtml(p.code)}</div>
+        <div><strong>Carrier:</strong> ${escapeHtml(p.carrier || 'Onbekend')}</div>
+        <div><strong>Opmerkingen:</strong> ${escapeHtml(p.note || '')}</div>
+        <div style="margin-top:8px">
+          <label>Wijzig status: </label>
+          <select id="status-select-${escapeHtml(p.id)}">
+            <option ${p.status==='Nieuw'?'selected':''}>Nieuw</option>
+            <option ${p.status==='In transit'?'selected':''}>In transit</option>
+            <option ${p.status==='Bezorgd'?'selected':''}>Bezorgd</option>
+            <option ${p.status==='Geannuleerd'?'selected':''}>Geannuleerd</option>
+          </select>
+          <button class="small" id="save-status-${escapeHtml(p.id)}">Opslaan</button>
+        </div>
+      `;
+      itemEl.appendChild(d);
+
+      document.getElementById(`save-status-${p.id}`).onclick = () => {
+        const sel = document.getElementById(`status-select-${p.id}`);
+        updatePackage({ ...p, status: sel.value });
+      };
+    }
+
+    function editPackage(id){
+      const p = packages.find(x => x.id === id);
+      if (!p) return;
+      const code = prompt('Trackingnummer', p.code);
+      if (code === null) return; // cancel
+      const note = prompt('Omschrijving', p.note || '');
+      if (note === null) return;
+      // detect carrier again
+      const carrier = detectCarrier(code);
+      updatePackage({ ...p, code: code.trim(), note: note.trim(), carrier });
+    }
+
+    function deletePackage(id){
+      packages = packages.filter(x => x.id !== id);
+      savePackages(packages);
+      populateCarrierFilter();
+      render();
+    }
+
+    function updatePackage(updated){
+      packages = packages.map(p => p.id === updated.id ? { ...p, ...updated } : p);
+      savePackages(packages);
+      populateCarrierFilter();
+      render();
+    }
+
+    // Add flow with optimistic UI but immediate save (small race risk remains if multiple tabs)
+    addBtn.onclick = () => {
+      const code = codeInput.value.trim();
+      if (!code){ alert('Voer een trackingnummer in.'); codeInput.focus(); return; }
+      const note = noteInput.value.trim();
+      const status = statusSelect.value;
+      const carrier = detectCarrier(code);
+      const pkg = {
+        id: uuidv4(),
+        code,
+        carrier,
+        note,
+        status,
+        history: [],
+        createdAt: new Date().toISOString()
+      };
+      // update state
+      packages = [pkg, ...packages];
+      savePackages(packages);
+      populateCarrierFilter();
+      render();
+      codeInput.value = '';
+      noteInput.value = '';
+      statusSelect.value = 'Nieuw';
+      codeInput.focus();
+    };
+
+    // Import/Export
+    importBtn.onclick = () => fileImport.click();
+    fileImport.onchange = async (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      try{
+        const text = await f.text();
+        const parsed = JSON.parse(text);
+        if (!Array.isArray(parsed)) throw new Error('Bestand bevat geen lijst');
+        // Merge imported packages (avoid id collisions by overwriting)
+        const map = new Map(packages.map(p => [p.id, p]));
+        parsed.forEach(p => {
+          if (!p.id) p.id = uuidv4();
+          map.set(p.id, p);
+        });
+        packages = Array.from(map.values()).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
+        savePackages(packages);
+        populateCarrierFilter();
+        render();
+        alert('Import geslaagd');
+      }catch(err){
+        alert('Import mislukt: ' + (err && err.message));
+      }finally{ fileImport.value = ''; }
+    };
+
+    // Utility: escape HTML
+    function escapeHtml(str){
+      if (str === undefined || str === null) return '';
+      return String(str).replace(/[&<>\"']/g, function(c){
+        return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;' }[c];
+      });
+    }
+
+    // Initialize UI
+    populateCarrierFilter();
+    attachFilterListeners();
+    // Register service worker for offline support (requires serving over http(s))
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(()=>console.log('SW registered')).catch(()=>console.warn('SW registration failed'));
+    }
+    render();
+  </script>
+</body>
+</html>
