@@ -353,11 +353,17 @@
       const providerLink = providerUrl
         ? `<a href="${providerUrl}" target="_blank" rel="noopener noreferrer">Open trackingpagina</a>`
         : 'Geen providerpagina beschikbaar';
+      const history = Array.isArray(p.history) ? p.history : [];
+      const historyMarkup = history.length
+        ? `<ul>${history.map(entry => `<li>${escapeHtml(entry.status || 'Onbekend')} — ${escapeHtml(entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'Onbekend tijdstip')}</li>`).join('')}</ul>`
+        : '<div>Geen statusgeschiedenis beschikbaar.</div>';
       d.innerHTML = `
         <div><strong>Tracking:</strong> ${escapeHtml(p.code)}</div>
         <div><strong>Carrier:</strong> ${escapeHtml(p.carrier || 'Onbekend')}</div>
         <div><strong>Provider:</strong> ${providerLink}</div>
         <div><strong>Opmerkingen:</strong> ${escapeHtml(p.note || '')}</div>
+        <div><strong>Geschiedenis:</strong></div>
+        ${historyMarkup}
       `;
       itemEl.appendChild(d);
     }
