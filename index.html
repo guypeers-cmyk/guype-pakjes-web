@@ -330,8 +330,8 @@
         providerRow.className = 'provider-link';
         const providerUrl = getProviderTrackingUrl(p.carrier, p.code);
         providerRow.innerHTML = providerUrl
-          ? `<strong>Provider:</strong> <a href="${providerUrl}" target="_blank" rel="noopener noreferrer">Bekijk volledige geschiedenis</a>`
-          : '<strong>Provider:</strong> Geen providerpagina beschikbaar';
+          ? `<strong>Laatste locatie:</strong> <a href="${providerUrl}" target="_blank" rel="noopener noreferrer">Bekijk bij provider</a>`
+          : '<strong>Laatste locatie:</strong> Geen providerpagina beschikbaar';
 
         const created = document.createElement('div');
         created.className = 'meta small';
