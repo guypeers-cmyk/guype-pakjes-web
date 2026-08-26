@@ -32,6 +32,7 @@
     .history-entry time{display:block;color:#64748b;font-size:11px;margin-top:1px}
     .history-empty{font-size:13px;color:#64748b}
     .controls{display:flex;flex-direction:column;gap:8px}
+    .delete-button{align-self:flex-start;background:#d92d20;color:#fff;text-align:left}
     .small{font-size:13px;padding:6px 8px;border-radius:6px}
     .tag{display:inline-block;background:#f1f7ff;color:var(--primary);padding:4px 8px;border-radius:999px;font-size:12px;margin-left:8px}
     .empty{padding:24px;color:var(--muted)}
@@ -329,7 +330,7 @@
         controls.className = 'controls';
 
         const btnDelete = document.createElement('button');
-        btnDelete.className = 'small ghost';
+        btnDelete.className = 'small delete-button';
         btnDelete.textContent = 'Verwijderen';
         btnDelete.onclick = () => { if (confirm('Pakket verwijderen?')) deletePackage(p.id); };
 
