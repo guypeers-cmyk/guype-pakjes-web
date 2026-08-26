@@ -31,12 +31,12 @@
     .history-entry strong{font-weight:600}
     .history-entry time{display:block;color:#64748b;font-size:11px;margin-top:1px}
     .history-empty{font-size:13px;color:#64748b}
+    .provider-link{margin-top:8px;font-size:13px}
     .controls{display:flex;flex-direction:column;gap:8px}
     .delete-button{align-self:flex-start;background:#d92d20;color:#fff;text-align:left}
     .small{font-size:13px;padding:6px 8px;border-radius:6px}
     .tag{display:inline-block;background:#f1f7ff;color:var(--primary);padding:4px 8px;border-radius:999px;font-size:12px;margin-left:8px}
     .empty{padding:24px;color:var(--muted)}
-    .details{margin-top:8px;background:#fbfdff;border:1px solid #eef6ff;padding:10px;border-radius:8px}
     footer{padding:12px 18px;background:#fafbff;color:var(--muted);font-size:13px}
     .actions{display:flex;gap:8px}
     @media (max-width:640px){.controls{flex-direction:row}}
@@ -316,6 +316,13 @@
         const history = Array.isArray(p.history) ? p.history : [];
         historyRow.innerHTML = '<div class="history-title">Geschiedenis</div>' + renderHistory(history);
 
+        const providerRow = document.createElement('div');
+        providerRow.className = 'provider-link';
+        const providerUrl = getProviderTrackingUrl(p.carrier, p.code);
+        providerRow.innerHTML = providerUrl
+          ? `<strong>Locatie/status:</strong> <a href="${providerUrl}" target="_blank" rel="noopener noreferrer">Open trackingpagina</a>`
+          : '<strong>Locatie/status:</strong> Geen providerpagina beschikbaar';
+
         const created = document.createElement('div');
         created.className = 'meta small';
         created.textContent = 'Aangemaakt: ' + new Date(p.createdAt).toLocaleString();
@@ -324,6 +331,7 @@
         meta.appendChild(noteRow);
         meta.appendChild(statusRow);
         meta.appendChild(historyRow);
+        meta.appendChild(providerRow);
         meta.appendChild(created);
 
         const controls = document.createElement('div');
@@ -340,7 +348,6 @@
         item.appendChild(controls);
 
         listEl.appendChild(item);
-        showDetails(p.id, item);
       });
     }
 
@@ -355,28 +362,6 @@
         FedEx: `https://www.fedex.com/fedextrack/?trknbr=${encodedCode}`
       };
       return urls[carrier] || '';
-    }
-
-    function showDetails(id, itemEl){
-      const p = packages.find(x => x.id === id);
-      if (!p) return;
-      const d = document.createElement('div');
-      d.className = 'details';
-      const providerUrl = getProviderTrackingUrl(p.carrier, p.code);
-      const providerLink = providerUrl
-        ? `<a href="${providerUrl}" target="_blank" rel="noopener noreferrer">Open trackingpagina</a>`
-        : 'Geen providerpagina beschikbaar';
-      const history = Array.isArray(p.history) ? p.history : [];
-      const historyMarkup = renderHistory(history);
-      d.innerHTML = `
-        <div><strong>Tracking:</strong> ${escapeHtml(p.code)}</div>
-        <div><strong>Carrier:</strong> ${escapeHtml(p.carrier || 'Onbekend')}</div>
-        <div><strong>Locatie/status:</strong> ${providerLink}</div>
-        <div><strong>Opmerkingen:</strong> ${escapeHtml(p.note || '')}</div>
-        <div class="history-title">Geschiedenis</div>
-        ${historyMarkup}
-      `;
-      itemEl.appendChild(d);
     }
 
     function deletePackage(id){
