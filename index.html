@@ -51,8 +51,6 @@
         <div class="actions">
           <button id="addBtn">Toevoegen</button>
           <button id="checkNowBtn" class="ghost" type="button">Controleer nu</button>
-          <button id="importBtn" class="ghost" type="button">Import</button>
-          <button id="exportBtn" class="ghost" type="button">Export</button>
         </div>
       </form>
       <div id="checkMessage" class="note" role="status" aria-live="polite"></div>
@@ -76,8 +74,6 @@
 
       <div id="empty" class="empty" style="display:none">Nog geen pakketten toegevoegd.</div>
 
-      <!-- hidden file input for import -->
-      <input type="file" id="fileImport" style="display:none" accept="application/json" />
     </div>
     <footer>
       Opslag: localStorage • Bestand: pakjes_app_packages_v1
@@ -151,15 +147,12 @@
     const addBtn = document.getElementById('addBtn');
     const checkNowBtn = document.getElementById('checkNowBtn');
     const checkMessage = document.getElementById('checkMessage');
-    const importBtn = document.getElementById('importBtn');
-    const exportBtn = document.getElementById('exportBtn');
-    const fileImport = document.getElementById('fileImport');
     const searchInput = document.getElementById('searchInput');
     const carrierFilter = document.getElementById('carrierFilter');
     const statusFilter = document.getElementById('statusFilter');
     const clearFilter = document.getElementById('clearFilter');
 
-    // Filtering, search and export helpers
+    // Filtering helpers
     function getUniqueCarriers(list){
       const s = new Set();
       (list || []).forEach(p => { if (p.carrier) s.add(p.carrier); });
@@ -252,7 +245,6 @@
       if (carrierFilter) carrierFilter.onchange = render;
       if (statusFilter) statusFilter.onchange = render;
       if (clearFilter) clearFilter.onclick = () => { if (searchInput) searchInput.value=''; if (carrierFilter) carrierFilter.value=''; if (statusFilter) statusFilter.value=''; render(); };
-      if (exportBtn) exportBtn.onclick = () => { exportJSON(packages); exportCSV(packages); };
       if (checkNowBtn) checkNowBtn.onclick = checkAllPackages;
     }
 
@@ -277,31 +269,6 @@
         checkNowBtn.disabled = false;
         checkNowBtn.textContent = 'Controleer nu';
       }
-    }
-
-    function exportJSON(list){
-      const blob = new Blob([JSON.stringify(list, null, 2)], {type:'application/json'});
-      downloadBlob(blob, 'pakjes-export.json');
-    }
-
-    function exportCSV(list){
-      if (!list || !list.length) return;
-      const headers = ['id','code','carrier','note','status','createdAt'];
-      const rows = list.map(p => headers.map(h => '"' + String(p[h]||'').replace(/"/g,'""') + '"').join(','));
-      const csv = [headers.join(','), ...rows].join('\n');
-      const blob = new Blob([csv], {type:'text/csv'});
-      downloadBlob(blob, 'pakjes-export.csv');
-    }
-
-    function downloadBlob(blob, filename){
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url), 5000);
     }
 
     function render(){
@@ -431,31 +398,6 @@
       noteInput.value = '';
       statusSelect.value = 'Nieuw';
       codeInput.focus();
-    };
-
-    // Import/Export
-    importBtn.onclick = () => fileImport.click();
-    fileImport.onchange = async (e) => {
-      const f = e.target.files[0];
-      if (!f) return;
-      try{
-        const text = await f.text();
-        const parsed = JSON.parse(text);
-        if (!Array.isArray(parsed)) throw new Error('Bestand bevat geen lijst');
-        // Merge imported packages (avoid id collisions by overwriting)
-        const map = new Map(packages.map(p => [p.id, p]));
-        parsed.forEach(p => {
-          if (!p.id) p.id = uuidv4();
-          map.set(p.id, p);
-        });
-        packages = Array.from(map.values()).sort((a,b)=> new Date(b.createdAt)-new Date(a.createdAt));
-        savePackages(packages);
-        populateCarrierFilter();
-        render();
-        alert('Import geslaagd');
-      }catch(err){
-        alert('Import mislukt: ' + (err && err.message));
-      }finally{ fileImport.value = ''; }
     };
 
     // Utility: escape HTML
