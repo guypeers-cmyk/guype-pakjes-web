@@ -224,14 +224,15 @@
           if (!response.ok) continue;
           const payload = await response.json();
           if (payload && payload.status) {
+            const currentStatus = pkg.status || 'Nieuw';
             const updatedAt = payload.updatedAt || new Date().toISOString();
             const history = Array.isArray(pkg && pkg.history) ? pkg.history : [];
             return {
               ...pkg,
-              status: payload.status,
+              status: currentStatus,
               updatedAt,
               lastCheckedAt: updatedAt,
-              history: [...history, { status: payload.status, updatedAt }]
+              history: [...history, { status: currentStatus, updatedAt }]
             };
           }
         } catch (error) {
