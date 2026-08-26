@@ -23,6 +23,7 @@
     .code{font-weight:600}
     .note{color:var(--muted);margin-top:6px}
     .status{margin-top:8px;color:#333}
+    .history{margin-top:6px;color:var(--muted)}
     .controls{display:flex;flex-direction:column;gap:8px}
     .small{font-size:13px;padding:6px 8px;border-radius:6px}
     .tag{display:inline-block;background:#f1f7ff;color:var(--primary);padding:4px 8px;border-radius:999px;font-size:12px;margin-left:8px}
@@ -297,6 +298,13 @@
         statusRow.className = 'status';
         statusRow.textContent = 'Status: ' + (p.status || 'Nieuw');
 
+        const historyRow = document.createElement('div');
+        historyRow.className = 'history small';
+        const history = Array.isArray(p.history) ? p.history : [];
+        historyRow.innerHTML = history.length
+          ? '<strong>Geschiedenis:</strong> ' + history.map(entry => `${escapeHtml(entry.status || 'Onbekend')} (${escapeHtml(entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'Onbekend tijdstip')})`).join(' - ')
+          : '<strong>Geschiedenis:</strong> Nog niet gecontroleerd';
+
         const created = document.createElement('div');
         created.className = 'meta small';
         created.textContent = 'Aangemaakt: ' + new Date(p.createdAt).toLocaleString();
@@ -304,6 +312,7 @@
         meta.appendChild(codeRow);
         meta.appendChild(noteRow);
         meta.appendChild(statusRow);
+        meta.appendChild(historyRow);
         meta.appendChild(created);
 
         const controls = document.createElement('div');
