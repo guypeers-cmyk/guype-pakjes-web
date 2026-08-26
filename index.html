@@ -329,6 +329,19 @@
       });
     }
 
+    function getProviderTrackingUrl(carrier, code){
+      const encodedCode = encodeURIComponent(code || '');
+      const urls = {
+        PostNL: `https://jouw.postnl.nl/track-and-trace/${encodedCode}`,
+        DHL: `https://www.dhl.com/global-en/home/tracking.html?tracking-id=${encodedCode}`,
+        Bpost: `https://track.bpost.cloud/btr/web/#/search?itemCode=${encodedCode}`,
+        DPD: `https://tracking.dpd.de/status/en_US/parcel/${encodedCode}`,
+        UPS: `https://www.ups.com/track?tracknum=${encodedCode}`,
+        FedEx: `https://www.fedex.com/fedextrack/?trknbr=${encodedCode}`
+      };
+      return urls[carrier] || '';
+    }
+
     function toggleDetails(id, itemEl){
       const existing = itemEl.querySelector('.details');
       if (existing){ existing.remove(); return; }
@@ -336,9 +349,14 @@
       if (!p) return;
       const d = document.createElement('div');
       d.className = 'details';
+      const providerUrl = getProviderTrackingUrl(p.carrier, p.code);
+      const providerLink = providerUrl
+        ? `<a href="${providerUrl}" target="_blank" rel="noopener noreferrer">Open trackingpagina</a>`
+        : 'Geen providerpagina beschikbaar';
       d.innerHTML = `
         <div><strong>Tracking:</strong> ${escapeHtml(p.code)}</div>
         <div><strong>Carrier:</strong> ${escapeHtml(p.carrier || 'Onbekend')}</div>
+        <div><strong>Provider:</strong> ${providerLink}</div>
         <div><strong>Opmerkingen:</strong> ${escapeHtml(p.note || '')}</div>
         <div style="margin-top:8px">
           <label>Wijzig status: </label>
