@@ -347,24 +347,12 @@
         btnDetails.textContent = 'Details';
         btnDetails.onclick = () => toggleDetails(p.id, item);
 
-        const btnRefresh = document.createElement('button');
-        btnRefresh.className = 'small';
-        btnRefresh.textContent = 'Vernieuwen';
-        btnRefresh.onclick = async () => {
-          const next = await fetchParcelStatus(p);
-          packages = packages.map(pkg => pkg.id === p.id ? next : pkg);
-          savePackages(packages);
-          populateCarrierFilter();
-          render();
-        };
-
         const btnDelete = document.createElement('button');
         btnDelete.className = 'small ghost';
         btnDelete.textContent = 'Verwijderen';
         btnDelete.onclick = () => { if (confirm('Pakket verwijderen?')) deletePackage(p.id); };
 
         controls.appendChild(btnDetails);
-        controls.appendChild(btnRefresh);
         controls.appendChild(btnDelete);
 
         item.appendChild(meta);
