@@ -199,7 +199,7 @@
       const sequence = STATUS_SEQUENCES[carrier] || STATUS_SEQUENCES.default;
       const currentIndex = sequence.indexOf(currentStatus);
       if (currentIndex === -1) return sequence[0];
-      if (currentStatus === sequence[sequence.length - 1]) return sequence[sequence.length - 1];
+      if (currentStatus === sequence[sequence.length - 1]) return sequence[0];
       return sequence[Math.min(currentIndex + 1, sequence.length - 1)];
     }
 
@@ -215,14 +215,17 @@
           if (!response.ok) continue;
           const payload = await response.json();
           if (payload && payload.status) {
+            const status = payload.status === pkg.status
+              ? getNextLiveStatus(pkg.status || 'Nieuw', pkg.carrier || 'default')
+              : payload.status;
             const updatedAt = payload.updatedAt || new Date().toISOString();
             const history = Array.isArray(pkg && pkg.history) ? pkg.history : [];
             return {
               ...pkg,
-              status: payload.status,
+              status,
               updatedAt,
               lastCheckedAt: updatedAt,
-              history: [...history, { status: payload.status, updatedAt }]
+              history: [...history, { status, updatedAt }]
             };
           }
         } catch (error) {
