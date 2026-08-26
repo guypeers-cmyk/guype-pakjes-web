@@ -216,7 +216,7 @@
           const payload = await response.json();
           if (payload && payload.status) {
             const updatedAt = payload.updatedAt || new Date().toISOString();
-            const history = Array.isArray(pkg && pkg.history) ? pkg.history.slice(-4) : [];
+            const history = Array.isArray(pkg && pkg.history) ? pkg.history : [];
             return {
               ...pkg,
               status: payload.status,
@@ -232,7 +232,7 @@
 
       const nextStatus = getNextLiveStatus(pkg && pkg.status ? pkg.status : 'Nieuw', pkg && pkg.carrier ? pkg.carrier : 'default');
       const updatedAt = new Date().toISOString();
-      const history = Array.isArray(pkg && pkg.history) ? pkg.history.slice(-4) : [];
+      const history = Array.isArray(pkg && pkg.history) ? pkg.history : [];
       return {
         ...pkg,
         status: nextStatus,
@@ -358,7 +358,7 @@
         DHL: `https://www.dhl.com/global-en/home/tracking.html?tracking-id=${encodedCode}`,
         Bpost: `https://track.bpost.cloud/btr/web/#/search?itemCode=${encodedCode}`,
         DPD: `https://tracking.dpd.de/status/en_US/parcel/${encodedCode}`,
-        UPS: `https://www.ups.com/track?tracknum=${encodedCode}`,
+        UPS: `https://www.ups.com/track?tracknum=${encodedCode}&loc=en_US&requester=ST/trackdetails`,
         FedEx: `https://www.fedex.com/fedextrack/?trknbr=${encodedCode}`
       };
       return urls[carrier] || '';
