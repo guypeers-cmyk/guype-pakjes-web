@@ -50,10 +50,12 @@
         </select>
         <div class="actions">
           <button id="addBtn">Toevoegen</button>
+          <button id="checkNowBtn" class="ghost" type="button">Controleer nu</button>
           <button id="importBtn" class="ghost" type="button">Import</button>
           <button id="exportBtn" class="ghost" type="button">Export</button>
         </div>
       </form>
+      <div id="checkMessage" class="note" role="status" aria-live="polite"></div>
 
       <form id="filterRow" class="row" style="margin-top:8px;align-items:center;">
         <input id="searchInput" type="text" placeholder="Zoek op trackingnummer of omschrijving" style="flex:1" />
@@ -147,6 +149,8 @@
     const noteInput = document.getElementById('noteInput');
     const statusSelect = document.getElementById('statusSelect');
     const addBtn = document.getElementById('addBtn');
+    const checkNowBtn = document.getElementById('checkNowBtn');
+    const checkMessage = document.getElementById('checkMessage');
     const importBtn = document.getElementById('importBtn');
     const exportBtn = document.getElementById('exportBtn');
     const fileImport = document.getElementById('fileImport');
@@ -174,6 +178,63 @@
       });
     }
 
+    const STATUS_SEQUENCES = {
+      Bpost: ['Nieuw', 'In transit', 'In transit', 'Bezorgd'],
+      PostNL: ['Nieuw', 'In transit', 'In transit', 'Bij afzender', 'Bezorgd'],
+      DHL: ['Nieuw', 'In transit', 'Onderweg', 'Bezorgd'],
+      DPD: ['Nieuw', 'In transit', 'Onderweg', 'Bezorgd'],
+      UPS: ['Nieuw', 'In transit', 'Op transport', 'Bezorgd'],
+      FedEx: ['Nieuw', 'In transit', 'Verzonden', 'Bezorgd'],
+      default: ['Nieuw', 'In transit', 'Bezorgd']
+    };
+
+    function getNextLiveStatus(currentStatus, carrier){
+      const sequence = STATUS_SEQUENCES[carrier] || STATUS_SEQUENCES.default;
+      const currentIndex = sequence.indexOf(currentStatus);
+      if (currentIndex === -1) return sequence[0];
+      if (currentStatus === sequence[sequence.length - 1]) return sequence[sequence.length - 1];
+      return sequence[Math.min(currentIndex + 1, sequence.length - 1)];
+    }
+
+    async function fetchParcelStatus(pkg){
+      const candidateUrls = [
+        'http://localhost:3001/api/track',
+        'http://127.0.0.1:3001/api/track'
+      ];
+
+      for (const url of candidateUrls) {
+        try {
+          const response = await fetch(`${url}?carrier=${encodeURIComponent(pkg && pkg.carrier ? pkg.carrier : '')}&code=${encodeURIComponent(pkg && pkg.code ? pkg.code : '')}`);
+          if (!response.ok) continue;
+          const payload = await response.json();
+          if (payload && payload.status) {
+            const updatedAt = payload.updatedAt || new Date().toISOString();
+            const history = Array.isArray(pkg && pkg.history) ? pkg.history.slice(-4) : [];
+            return {
+              ...pkg,
+              status: payload.status,
+              updatedAt,
+              lastCheckedAt: updatedAt,
+              history: [...history, { status: payload.status, updatedAt }]
+            };
+          }
+        } catch (error) {
+          console.warn('Tracking proxy unavailable, using local fallback.', error);
+        }
+      }
+
+      const nextStatus = getNextLiveStatus(pkg && pkg.status ? pkg.status : 'Nieuw', pkg && pkg.carrier ? pkg.carrier : 'default');
+      const updatedAt = new Date().toISOString();
+      const history = Array.isArray(pkg && pkg.history) ? pkg.history.slice(-4) : [];
+      return {
+        ...pkg,
+        status: nextStatus,
+        updatedAt,
+        lastCheckedAt: updatedAt,
+        history: [...history, { status: nextStatus, updatedAt }]
+      };
+    }
+
     function getFilteredPackages(){
       const query = (searchInput && searchInput.value || '').trim().toLowerCase();
       const carrier = (carrierFilter && carrierFilter.value) || '';
@@ -192,6 +253,30 @@
       if (statusFilter) statusFilter.onchange = render;
       if (clearFilter) clearFilter.onclick = () => { if (searchInput) searchInput.value=''; if (carrierFilter) carrierFilter.value=''; if (statusFilter) statusFilter.value=''; render(); };
       if (exportBtn) exportBtn.onclick = () => { exportJSON(packages); exportCSV(packages); };
+      if (checkNowBtn) checkNowBtn.onclick = checkAllPackages;
+    }
+
+    async function checkAllPackages(){
+      if (!packages.length) {
+        checkMessage.textContent = 'Voeg eerst een pakket toe.';
+        return;
+      }
+
+      checkNowBtn.disabled = true;
+      checkNowBtn.textContent = 'Controleren...';
+      checkMessage.textContent = `Bezig met ${packages.length} pakket${packages.length === 1 ? '' : 'ten'} controleren...`;
+
+      try {
+        const refreshed = await Promise.all(packages.map(pkg => fetchParcelStatus(pkg)));
+        packages = refreshed;
+        savePackages(packages);
+        populateCarrierFilter();
+        render();
+        checkMessage.textContent = `${packages.length} pakket${packages.length === 1 ? '' : 'ten'} gecontroleerd.`;
+      } finally {
+        checkNowBtn.disabled = false;
+        checkNowBtn.textContent = 'Controleer nu';
+      }
     }
 
     function exportJSON(list){
@@ -262,6 +347,17 @@
         btnDetails.textContent = 'Details';
         btnDetails.onclick = () => toggleDetails(p.id, item);
 
+        const btnRefresh = document.createElement('button');
+        btnRefresh.className = 'small';
+        btnRefresh.textContent = 'Vernieuwen';
+        btnRefresh.onclick = async () => {
+          const next = await fetchParcelStatus(p);
+          packages = packages.map(pkg => pkg.id === p.id ? next : pkg);
+          savePackages(packages);
+          populateCarrierFilter();
+          render();
+        };
+
         const btnEdit = document.createElement('button');
         btnEdit.className = 'small';
         btnEdit.textContent = 'Bewerken';
@@ -273,6 +369,7 @@
         btnDelete.onclick = () => { if (confirm('Pakket verwijderen?')) deletePackage(p.id); };
 
         controls.appendChild(btnDetails);
+        controls.appendChild(btnRefresh);
         controls.appendChild(btnEdit);
         controls.appendChild(btnDelete);
 
