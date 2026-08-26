@@ -318,23 +318,18 @@
         const controls = document.createElement('div');
         controls.className = 'controls';
 
-        const btnDetails = document.createElement('button');
-        btnDetails.className = 'small ghost';
-        btnDetails.textContent = 'Details';
-        btnDetails.onclick = () => toggleDetails(p.id, item);
-
         const btnDelete = document.createElement('button');
         btnDelete.className = 'small ghost';
         btnDelete.textContent = 'Verwijderen';
         btnDelete.onclick = () => { if (confirm('Pakket verwijderen?')) deletePackage(p.id); };
 
-        controls.appendChild(btnDetails);
         controls.appendChild(btnDelete);
 
         item.appendChild(meta);
         item.appendChild(controls);
 
         listEl.appendChild(item);
+        showDetails(p.id, item);
       });
     }
 
@@ -351,9 +346,7 @@
       return urls[carrier] || '';
     }
 
-    function toggleDetails(id, itemEl){
-      const existing = itemEl.querySelector('.details');
-      if (existing){ existing.remove(); return; }
+    function showDetails(id, itemEl){
       const p = packages.find(x => x.id === id);
       if (!p) return;
       const d = document.createElement('div');
@@ -369,7 +362,7 @@
       d.innerHTML = `
         <div><strong>Tracking:</strong> ${escapeHtml(p.code)}</div>
         <div><strong>Carrier:</strong> ${escapeHtml(p.carrier || 'Onbekend')}</div>
-        <div><strong>Provider:</strong> ${providerLink}</div>
+        <div><strong>Locatie/status:</strong> ${providerLink}</div>
         <div><strong>Opmerkingen:</strong> ${escapeHtml(p.note || '')}</div>
         <div><strong>Geschiedenis:</strong></div>
         ${historyMarkup}
