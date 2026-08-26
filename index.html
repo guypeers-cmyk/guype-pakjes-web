@@ -23,7 +23,14 @@
     .code{font-weight:600}
     .note{color:var(--muted);margin-top:6px}
     .status{margin-top:8px;color:#333}
-    .history{margin-top:6px;color:var(--muted)}
+    .history{margin-top:8px;padding:10px 12px;background:#f7faff;border:1px solid #e4eefb;border-radius:8px;color:#334155}
+    .history-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b;margin-bottom:7px}
+    .history-list{display:grid;gap:6px}
+    .history-entry{display:flex;align-items:flex-start;gap:8px;font-size:13px}
+    .history-dot{width:7px;height:7px;margin-top:4px;background:var(--primary);border-radius:50%;flex:0 0 auto}
+    .history-entry strong{font-weight:600}
+    .history-entry time{display:block;color:#64748b;font-size:11px;margin-top:1px}
+    .history-empty{font-size:13px;color:#64748b}
     .controls{display:flex;flex-direction:column;gap:8px}
     .small{font-size:13px;padding:6px 8px;border-radius:6px}
     .tag{display:inline-block;background:#f1f7ff;color:var(--primary);padding:4px 8px;border-radius:999px;font-size:12px;margin-left:8px}
@@ -91,6 +98,11 @@
           const r = Math.random()*16|0, v = c === 'x' ? r : (r&0x3|0x8);
           return v.toString(16);
       });
+    }
+
+    function renderHistory(history){
+      if (!history.length) return '<div class="history-empty">Nog niet gecontroleerd</div>';
+      return `<div class="history-list">${history.map(entry => `<div class="history-entry"><span class="history-dot"></span><div><strong>${escapeHtml(entry.status || 'Onbekend')}</strong><time>${escapeHtml(entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'Onbekend tijdstip')}</time></div></div>`).join('')}</div>`;
     }
 
     // Improved carrier detection: remove non-alphanumeric, uppercase
@@ -299,11 +311,9 @@
         statusRow.textContent = 'Status: ' + (p.status || 'Nieuw');
 
         const historyRow = document.createElement('div');
-        historyRow.className = 'history small';
+        historyRow.className = 'history';
         const history = Array.isArray(p.history) ? p.history : [];
-        historyRow.innerHTML = history.length
-          ? '<strong>Geschiedenis:</strong> ' + history.map(entry => `${escapeHtml(entry.status || 'Onbekend')} (${escapeHtml(entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'Onbekend tijdstip')})`).join(' - ')
-          : '<strong>Geschiedenis:</strong> Nog niet gecontroleerd';
+        historyRow.innerHTML = '<div class="history-title">Geschiedenis</div>' + renderHistory(history);
 
         const created = document.createElement('div');
         created.className = 'meta small';
@@ -356,15 +366,13 @@
         ? `<a href="${providerUrl}" target="_blank" rel="noopener noreferrer">Open trackingpagina</a>`
         : 'Geen providerpagina beschikbaar';
       const history = Array.isArray(p.history) ? p.history : [];
-      const historyMarkup = history.length
-        ? `<ul>${history.map(entry => `<li>${escapeHtml(entry.status || 'Onbekend')} — ${escapeHtml(entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : 'Onbekend tijdstip')}</li>`).join('')}</ul>`
-        : '<div>Geen statusgeschiedenis beschikbaar.</div>';
+      const historyMarkup = renderHistory(history);
       d.innerHTML = `
         <div><strong>Tracking:</strong> ${escapeHtml(p.code)}</div>
         <div><strong>Carrier:</strong> ${escapeHtml(p.carrier || 'Onbekend')}</div>
         <div><strong>Locatie/status:</strong> ${providerLink}</div>
         <div><strong>Opmerkingen:</strong> ${escapeHtml(p.note || '')}</div>
-        <div><strong>Geschiedenis:</strong></div>
+        <div class="history-title">Geschiedenis</div>
         ${historyMarkup}
       `;
       itemEl.appendChild(d);
