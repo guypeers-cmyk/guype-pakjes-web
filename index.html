@@ -358,34 +358,12 @@
         <div><strong>Carrier:</strong> ${escapeHtml(p.carrier || 'Onbekend')}</div>
         <div><strong>Provider:</strong> ${providerLink}</div>
         <div><strong>Opmerkingen:</strong> ${escapeHtml(p.note || '')}</div>
-        <div style="margin-top:8px">
-          <label>Wijzig status: </label>
-          <select id="status-select-${escapeHtml(p.id)}">
-            <option ${p.status==='Nieuw'?'selected':''}>Nieuw</option>
-            <option ${p.status==='In transit'?'selected':''}>In transit</option>
-            <option ${p.status==='Bezorgd'?'selected':''}>Bezorgd</option>
-            <option ${p.status==='Geannuleerd'?'selected':''}>Geannuleerd</option>
-          </select>
-          <button class="small" id="save-status-${escapeHtml(p.id)}">Opslaan</button>
-        </div>
       `;
       itemEl.appendChild(d);
-
-      document.getElementById(`save-status-${p.id}`).onclick = () => {
-        const sel = document.getElementById(`status-select-${p.id}`);
-        updatePackage({ ...p, status: sel.value });
-      };
     }
 
     function deletePackage(id){
       packages = packages.filter(x => x.id !== id);
-      savePackages(packages);
-      populateCarrierFilter();
-      render();
-    }
-
-    function updatePackage(updated){
-      packages = packages.map(p => p.id === updated.id ? { ...p, ...updated } : p);
       savePackages(packages);
       populateCarrierFilter();
       render();
